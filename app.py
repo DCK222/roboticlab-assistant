@@ -1,5 +1,7 @@
 import streamlit as st
 import os
+import base64
+from PIL import Image
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -9,9 +11,16 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 
+# ── Logo como base64 para HTML y PIL para avatares ────────────────────────────
+LOGO_PATH = os.path.join(os.path.dirname(__file__), "logo.webp")
+logo_img = Image.open(LOGO_PATH)
+with open(LOGO_PATH, "rb") as f:
+    logo_b64 = base64.b64encode(f.read()).decode()
+logo_src = f"data:image/webp;base64,{logo_b64}"
+
 st.set_page_config(
     page_title="RoboticLab Assistant",
-    page_icon="logo.webp",
+    page_icon=logo_img,
     layout="centered",
 )
 
@@ -23,11 +32,9 @@ st.markdown("""
 
 .stApp { background: #1a1a1a; color: #ececec; }
 
-/* Ocultar elementos de streamlit */
 #MainMenu, footer, header { visibility: hidden; }
 .stDeployButton { display: none; }
 
-/* Input de chat */
 .stChatInput textarea {
     background: #2d2d2d !important;
     border: 1px solid #3d3d3d !important;
@@ -45,7 +52,6 @@ st.markdown("""
     border-radius: 12px !important;
 }
 
-/* Mensajes */
 .stChatMessage {
     background: transparent !important;
     border: none !important;
@@ -58,14 +64,12 @@ st.markdown("""
     color: #ececec;
 }
 
-/* Usuario */
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
     background: #2d2d2d !important;
     border-radius: 12px !important;
     padding: 0.8rem 1rem !important;
 }
 
-/* Boton limpiar */
 .stButton > button {
     background: transparent !important;
     border: 1px solid #3d3d3d !important;
@@ -80,7 +84,6 @@ st.markdown("""
     color: #ccc !important;
 }
 
-/* API key input */
 .stTextInput input {
     background: #2d2d2d !important;
     border: 1px solid #3d3d3d !important;
@@ -92,10 +95,7 @@ st.markdown("""
     box-shadow: none !important;
 }
 
-/* Divider */
 hr { border-color: #2d2d2d !important; }
-
-/* Spinner */
 .stSpinner > div { border-top-color: #666 !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -108,7 +108,7 @@ GROQ_API_KEY = (
 )
 
 if not GROQ_API_KEY:
-    st.image("logo.webp", width=72)
+    st.markdown(f"<div style='text-align:center;padding-top:3rem'><img src='{logo_src}' width='72'></div>", unsafe_allow_html=True)
     st.markdown("## RoboticLab Assistant")
     st.markdown("<span style='color:#888'>Introduce tu Groq API Key para comenzar</span>", unsafe_allow_html=True)
     st.markdown("")
@@ -124,7 +124,8 @@ GROQ_API_KEY = GROQ_API_KEY or st.session_state.get("groq_api_key", "")
 # ── RAG chain (cacheada) ──────────────────────────────────────────────────────
 @st.cache_resource(show_spinner="Cargando base de conocimiento...")
 def build_chain(api_key: str):
-    loader = TextLoader("DOSSIER ACTIVIDADES ROBOTICLAB.txt", encoding="utf-8")
+    txt = os.path.join(os.path.dirname(__file__), "DOSSIER ACTIVIDADES ROBOTICLAB.txt")
+    loader = TextLoader(txt, encoding="utf-8")
     docs = loader.load()
     spl = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=120)
     chunks = spl.split_documents(docs)
@@ -158,7 +159,7 @@ chain = build_chain(GROQ_API_KEY)
 # ── Header ────────────────────────────────────────────────────────────────────
 col_logo, col_title, col_btn = st.columns([0.6, 5, 1.4])
 with col_logo:
-    st.image("logo.webp", width=44)
+    st.image(logo_img, width=44)
 with col_title:
     st.markdown("<h3 style='margin:0; padding-top:4px; color:#ececec'>RoboticLab Assistant</h3>", unsafe_allow_html=True)
 with col_btn:
@@ -173,16 +174,17 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if not st.session_state.messages:
-    st.markdown("""
+    st.markdown(f"""
     <div style='text-align:center; padding:4rem 2rem; color:#555'>
-        <img src='logo.webp' style='width:56px; opacity:0.4; margin-bottom:1rem'>
+        <img src='{logo_src}' style='width:56px; opacity:0.4; margin-bottom:1rem'>
         <div style='font-size:1.1rem; font-weight:500; color:#666'>¿En qué puedo ayudarte?</div>
         <div style='font-size:0.85rem; margin-top:0.4rem'>Pregunta sobre actividades, talleres o servicios de RoboticLab</div>
     </div>
     """, unsafe_allow_html=True)
 
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"], avatar="logo.webp" if msg["role"] == "assistant" else None):
+    avatar = logo_img if msg["role"] == "assistant" else None
+    with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
 
 # ── Input ─────────────────────────────────────────────────────────────────────
@@ -191,7 +193,7 @@ if pregunta := st.chat_input("Pregunta algo sobre RoboticLab..."):
     with st.chat_message("user"):
         st.markdown(pregunta)
 
-    with st.chat_message("assistant", avatar="logo.webp"):
+    with st.chat_message("assistant", avatar=logo_img):
         with st.spinner(""):
             try:
                 respuesta = chain.invoke(pregunta)
