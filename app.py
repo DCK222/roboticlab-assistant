@@ -100,26 +100,11 @@ hr { border-color: #2d2d2d !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── API Key — se guarda en session_state ──────────────────────────────────────
+# ── API Key ───────────────────────────────────────────────────────────────────
 GROQ_API_KEY = (
     st.secrets.get("GROQ_API_KEY", "")
     or os.getenv("GROQ_API_KEY", "")
-    or st.session_state.get("groq_api_key", "")
 )
-
-if not GROQ_API_KEY:
-    st.markdown(f"<div style='text-align:center;padding-top:3rem'><img src='{logo_src}' width='72'></div>", unsafe_allow_html=True)
-    st.markdown("## RoboticLab Assistant")
-    st.markdown("<span style='color:#888'>Introduce tu Groq API Key para comenzar</span>", unsafe_allow_html=True)
-    st.markdown("")
-    key_input = st.text_input("", placeholder="gsk_...", type="password", label_visibility="collapsed")
-    st.caption("Obtén una gratis en [console.groq.com](https://console.groq.com) · Solo se guarda en tu sesión")
-    if key_input:
-        st.session_state["groq_api_key"] = key_input
-        st.rerun()
-    st.stop()
-
-GROQ_API_KEY = GROQ_API_KEY or st.session_state.get("groq_api_key", "")
 
 # ── RAG chain (cacheada) ──────────────────────────────────────────────────────
 @st.cache_resource(show_spinner="Cargando base de conocimiento...")
