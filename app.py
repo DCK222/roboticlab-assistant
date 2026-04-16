@@ -184,7 +184,7 @@ def build_chain(api_key: str):
     emb = HuggingFaceEmbeddings(model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2")
     vs = FAISS.from_documents(chunks, emb)
     retriever = vs.as_retriever(search_kwargs={"k": 4})
-    llm = ChatGroq(model="llama3-8b-8192", api_key=api_key, temperature=0.2)
+    llm = ChatGroq(model="llama-3.1-8b-instant", api_key=api_key, temperature=0.2)
     prompt = PromptTemplate.from_template("""
 Eres un asistente util de RoboticLab. Responde en espanol usando unicamente
 la informacion del contexto proporcionado. Si no encuentras la respuesta, dilo claramente.
