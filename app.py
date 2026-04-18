@@ -11,105 +11,156 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 
-# ── Logo como base64 para HTML y PIL para avatares ────────────────────────────
-LOGO_PATH = os.path.join(os.path.dirname(__file__), "logo.webp")
+GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
+
+BASE = os.path.dirname(os.path.abspath(__file__))
+LOGO_PATH = os.path.join(BASE, "logo.webp")
 logo_img = Image.open(LOGO_PATH)
 with open(LOGO_PATH, "rb") as f:
     logo_b64 = base64.b64encode(f.read()).decode()
 logo_src = f"data:image/webp;base64,{logo_b64}"
 
-st.set_page_config(
-    page_title="RoboticLab Assistant",
-    page_icon=logo_img,
-    layout="centered",
-)
+st.set_page_config(page_title="RoboticLab", page_icon=logo_img, layout="centered")
 
-st.markdown("""
+st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
-* { font-family: 'Inter', sans-serif; }
+*, *::before, *::after {{ box-sizing: border-box; font-family: 'Inter', sans-serif; }}
 
-.stApp { background: #1a1a1a; color: #ececec; }
+/* Reset Streamlit chrome */
+#MainMenu, footer, header, .stDeployButton {{ display: none !important; }}
+.block-container {{ padding: 0 !important; max-width: 760px !important; }}
+.stApp {{ background: #0f0f0f; }}
 
-#MainMenu, footer, header { visibility: hidden; }
-.stDeployButton { display: none; }
+/* Navbar */
+.navbar {{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 24px;
+    border-bottom: 1px solid #1e1e1e;
+    position: sticky;
+    top: 0;
+    background: #0f0f0f;
+    z-index: 100;
+}}
+.navbar img {{ width: 32px; height: 32px; border-radius: 6px; object-fit: cover; }}
+.navbar-title {{ font-size: 1rem; font-weight: 600; color: #f5f5f5; }}
+.navbar-sub {{ font-size: 0.75rem; color: #555; margin-left: auto; }}
 
-.stChatInput textarea {
-    background: #2d2d2d !important;
-    border: 1px solid #3d3d3d !important;
+/* Chat container */
+.chat-wrap {{ padding: 24px 24px 100px; }}
+
+/* Empty state */
+.empty-state {{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    gap: 12px;
+}}
+.empty-state img {{ width: 48px; height: 48px; border-radius: 10px; opacity: 0.6; }}
+.empty-state h2 {{ font-size: 1.3rem; font-weight: 600; color: #ccc; margin: 0; }}
+.empty-state p {{ font-size: 0.88rem; color: #555; margin: 0; text-align: center; }}
+
+/* Mensajes */
+.msg-row {{
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    align-items: flex-start;
+}}
+.msg-row.user {{ flex-direction: row-reverse; }}
+
+.avatar {{
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    overflow: hidden;
+}}
+.avatar img {{ width: 100%; height: 100%; object-fit: cover; }}
+.avatar.user-av {{
+    background: #2a2a2a;
+    color: #888;
+    border: 1px solid #2e2e2e;
+}}
+
+.bubble {{
+    max-width: 82%;
+    padding: 11px 15px;
+    border-radius: 14px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: #e8e8e8;
+}}
+.bubble.bot {{
+    background: #161616;
+    border: 1px solid #202020;
+    border-radius: 4px 14px 14px 14px;
+}}
+.bubble.user {{
+    background: #1a2a3d;
+    border: 1px solid #1e3450;
+    border-radius: 14px 4px 14px 14px;
+    color: #d8eaff;
+}}
+
+/* Input */
+.stChatInput > div {{
+    background: #161616 !important;
+    border: 1px solid #282828 !important;
     border-radius: 12px !important;
-    color: #ececec !important;
-    font-size: 0.95rem !important;
-}
-.stChatInput textarea:focus {
-    border-color: #555 !important;
+    box-shadow: 0 0 0 0 transparent !important;
+}}
+.stChatInput > div:focus-within {{
+    border-color: #333 !important;
     box-shadow: none !important;
-}
-.stChatInput > div {
-    background: #2d2d2d !important;
-    border: 1px solid #3d3d3d !important;
-    border-radius: 12px !important;
-}
-
-.stChatMessage {
+}}
+.stChatInput textarea {{
     background: transparent !important;
-    border: none !important;
-    padding: 0.6rem 0 !important;
-}
+    color: #e8e8e8 !important;
+    font-size: 0.9rem !important;
+    caret-color: #e8e8e8 !important;
+}}
+.stChatInput textarea::placeholder {{ color: #444 !important; }}
+section[data-testid="stBottom"] > div {{
+    background: #0f0f0f !important;
+    padding: 12px 24px 20px !important;
+    border-top: 1px solid #1a1a1a;
+}}
 
-[data-testid="stChatMessageContent"] p {
-    font-size: 0.95rem;
-    line-height: 1.65;
-    color: #ececec;
-}
-
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-    background: #2d2d2d !important;
-    border-radius: 12px !important;
-    padding: 0.8rem 1rem !important;
-}
-
-.stButton > button {
+/* Ocultar avatares nativos de Streamlit */
+[data-testid="chatAvatarIcon-user"],
+[data-testid="chatAvatarIcon-assistant"] {{ display: none !important; }}
+[data-testid="stChatMessage"] {{
     background: transparent !important;
-    border: 1px solid #3d3d3d !important;
-    color: #888 !important;
-    border-radius: 8px !important;
-    font-size: 0.82rem !important;
-    padding: 4px 14px !important;
-    transition: all 0.2s;
-}
-.stButton > button:hover {
-    border-color: #666 !important;
-    color: #ccc !important;
-}
+    padding: 0 !important;
+}}
+[data-testid="stChatMessageContent"] {{ background: transparent !important; padding: 0 !important; }}
 
-.stTextInput input {
-    background: #2d2d2d !important;
-    border: 1px solid #3d3d3d !important;
-    border-radius: 10px !important;
-    color: #ececec !important;
-}
-.stTextInput input:focus {
-    border-color: #666 !important;
-    box-shadow: none !important;
-}
-
-hr { border-color: #2d2d2d !important; }
-.stSpinner > div { border-top-color: #666 !important; }
+/* Spinner */
+.stSpinner p {{ color: #444 !important; font-size: 0.82rem !important; }}
 </style>
+
+<div class="navbar">
+    <img src="{logo_src}" alt="logo">
+    <span class="navbar-title">RoboticLab Assistant</span>
+    <span class="navbar-sub">LLaMA 3.1 · Groq</span>
+</div>
 """, unsafe_allow_html=True)
 
-# ── API Key ───────────────────────────────────────────────────────────────────
-GROQ_API_KEY = (
-    st.secrets.get("GROQ_API_KEY", "")
-    or os.getenv("GROQ_API_KEY", "")
-)
-
-# ── RAG chain (cacheada) ──────────────────────────────────────────────────────
+# ── RAG chain ─────────────────────────────────────────────────────────────────
 @st.cache_resource(show_spinner="Cargando base de conocimiento...")
 def build_chain(api_key: str):
-    txt = os.path.join(os.path.dirname(__file__), "DOSSIER ACTIVIDADES ROBOTICLAB.txt")
+    txt = os.path.join(BASE, "DOSSIER ACTIVIDADES ROBOTICLAB.txt")
     loader = TextLoader(txt, encoding="utf-8")
     docs = loader.load()
     spl = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=120)
@@ -141,49 +192,59 @@ Respuesta:""")
 
 chain = build_chain(GROQ_API_KEY)
 
-# ── Header ────────────────────────────────────────────────────────────────────
-col_logo, col_title, col_btn = st.columns([0.6, 5, 1.4])
-with col_logo:
-    st.image(logo_img, width=44)
-with col_title:
-    st.markdown("<h3 style='margin:0; padding-top:4px; color:#ececec'>RoboticLab Assistant</h3>", unsafe_allow_html=True)
-with col_btn:
-    if st.button("Nueva chat"):
-        st.session_state.messages = []
-        st.rerun()
-
-st.markdown("<hr style='margin: 0.5rem 0 1rem'>", unsafe_allow_html=True)
-
 # ── Historial ─────────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+col_spacer, col_btn = st.columns([6, 1])
+with col_btn:
+    if st.button("Limpiar", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
+
 if not st.session_state.messages:
     st.markdown(f"""
-    <div style='text-align:center; padding:4rem 2rem; color:#555'>
-        <img src='{logo_src}' style='width:56px; opacity:0.4; margin-bottom:1rem'>
-        <div style='font-size:1.1rem; font-weight:500; color:#666'>¿En qué puedo ayudarte?</div>
-        <div style='font-size:0.85rem; margin-top:0.4rem'>Pregunta sobre actividades, talleres o servicios de RoboticLab</div>
+    <div class="empty-state">
+        <img src="{logo_src}" alt="logo">
+        <h2>¿En qué puedo ayudarte?</h2>
+        <p>Pregunta sobre actividades, talleres y servicios de RoboticLab</p>
     </div>
     """, unsafe_allow_html=True)
 
 for msg in st.session_state.messages:
-    avatar = logo_img if msg["role"] == "assistant" else None
-    with st.chat_message(msg["role"], avatar=avatar):
-        st.markdown(msg["content"])
+    if msg["role"] == "user":
+        st.markdown(f"""
+        <div class="msg-row user">
+            <div class="avatar user-av">TÚ</div>
+            <div class="bubble user">{msg["content"]}</div>
+        </div>""", unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="msg-row">
+            <div class="avatar"><img src="{logo_src}" alt="bot"></div>
+            <div class="bubble bot">{msg["content"]}</div>
+        </div>""", unsafe_allow_html=True)
 
 # ── Input ─────────────────────────────────────────────────────────────────────
-if pregunta := st.chat_input("Pregunta algo sobre RoboticLab..."):
+if pregunta := st.chat_input("Escribe tu pregunta..."):
     st.session_state.messages.append({"role": "user", "content": pregunta})
-    with st.chat_message("user"):
-        st.markdown(pregunta)
 
-    with st.chat_message("assistant", avatar=logo_img):
-        with st.spinner(""):
-            try:
-                respuesta = chain.invoke(pregunta)
-            except Exception as e:
-                respuesta = f"Error: {e}"
-        st.markdown(respuesta)
+    st.markdown(f"""
+    <div class="msg-row user">
+        <div class="avatar user-av">TÚ</div>
+        <div class="bubble user">{pregunta}</div>
+    </div>""", unsafe_allow_html=True)
+
+    with st.spinner("Pensando..."):
+        try:
+            respuesta = chain.invoke(pregunta)
+        except Exception as e:
+            respuesta = f"Error: {e}"
 
     st.session_state.messages.append({"role": "assistant", "content": respuesta})
+
+    st.markdown(f"""
+    <div class="msg-row">
+        <div class="avatar"><img src="{logo_src}" alt="bot"></div>
+        <div class="bubble bot">{respuesta}</div>
+    </div>""", unsafe_allow_html=True)
